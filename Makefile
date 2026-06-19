@@ -14,6 +14,8 @@ KERNEL_OBJS = kernel/kernel_entry.o \
               kernel/src/ata.o \
               kernel/src/pci.o \
               kernel/src/net.o \
+              kernel/src/net_icmp.o \
+              kernel/src/pkg.o \
               kernel/src/vga.o \
               kernel/src/string.o \
               kernel/src/keyboard.o \

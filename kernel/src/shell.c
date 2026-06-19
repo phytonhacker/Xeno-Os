@@ -6,6 +6,8 @@
 #include "../include/app.h"
 #include "../include/keyboard.h"
 #include "../include/net.h"
+#include "../include/net_icmp.h"
+#include "../include/pkg.h"
 
 #define INPUT_MAX 128
 #define PROMPT "X-DOS> "
@@ -26,6 +28,77 @@ void shell_prompt(void) {
     kprint_color(PROMPT, C_PROMPT);
 }
 
+/* ============================================================
+ * "x.x.x.x" formátumú IP cím szöveg feldolgozása bájtokra.
+ * Visszatérés: 1 ha sikerült, 0 ha hibás formátum.
+ * ============================================================ */
+static int parse_ip(const char* s, uint8_t out[4]) {
+    int part = 0, val = 0, digits = 0;
+    for (int i = 0; ; i++) {
+        char c = s[i];
+        if (c >= '0' && c <= '9') {
+            val = val * 10 + (c - '0');
+            digits++;
+            if (val > 255 || digits > 3) return 0;
+        } else if (c == '.' || c == '\0') {
+            if (digits == 0) return 0;
+            if (part > 3) return 0;
+            out[part++] = (uint8_t)val;
+            val = 0; digits = 0;
+            if (c == '\0') break;
+        } else {
+            return 0;
+        }
+    }
+    return part == 4;
+}
+
+static void cmd_ping(const char* host) {
+    if (kstrlen(host) == 0) {
+        kprint_color("Hasznalat: ping <ip cim> (pl. ping 192.168.1.1)\n", C_ERROR);
+        return;
+    }
+
+    uint8_t ip[4];
+    if (!parse_ip(host, ip)) {
+        kprint_color("Ervenytelen IP cim: ", C_ERROR);
+        kprint(host); kprint("\n");
+        return;
+    }
+
+    kprint_color("PING ", C_INFO);
+    kprint(host);
+    kprint_color(" ...\n", C_INFO);
+
+    int rtt = 0;
+    int result = net_icmp_ping(ip, 500000, &rtt);
+
+    if (result == -1) {
+        kprint_color("Hiba: nincs halozati kartya. Probald: XD install net\n", C_ERROR);
+    } else if (result == -2) {
+        kprint_color("Hiba: ARP feloldas sikertelen (cel nem elerheto).\n", C_ERROR);
+    } else if (result == 0) {
+        kprint_color("Idotullepes - nincs valasz.\n", C_ERROR);
+    } else {
+        kprint_color("Valasz erkezett ", C_PROMPT);
+        kprint(host);
+        kprint_color("-tol.\n", C_PROMPT);
+    }
+}
+
+static void cmd_xd(const char* args) {
+    /* "install <nev>" vagy "list" */
+    if (args[0]=='i'&&args[1]=='n'&&args[2]=='s'&&args[3]=='t'&&args[4]=='a'&&
+        args[5]=='l'&&args[6]=='l'&&args[7]==' ') {
+        pkg_install(args + 8);
+    } else if (kstrcmp(args, "list") == 0) {
+        pkg_list();
+    } else {
+        kprint_color("Hasznalat: XD install <csomagnev>  vagy  XD list\n", C_ERROR);
+    }
+}
+
+
 static void shell_exec(const char* cmd) {
     if (kstrlen(cmd) == 0) return;
 
@@ -40,13 +113,12 @@ static void shell_exec(const char* cmd) {
         kprint_color(" rm <fajlnev> - fajl torlese\n", C_DEFAULT);
         kprint_color(" cat <fajlnev> - fajl tartalma\n", C_DEFAULT);
         kprint_color(" set keyboard hu/en - billentyuzet\n", C_DEFAULT);
-        kprint_color(" ping <host> - ping parancs (pl. ping 192.168.1.1)\n", C_DEFAULT);
-        kprint_color(" XD install <csomagnev> - csomag telepitese (driver szint)\n", C_DEFAULT);
+        kprint_color(" ping <ip> - ping parancs (pl. ping 10.0.2.2)\n", C_DEFAULT);
+        kprint_color(" XD install <csomagnev> - csomag telepitese\n", C_DEFAULT);
+        kprint_color(" XD list - elerheto/telepitett csomagok\n", C_DEFAULT);
         kprint_color(" sync - fajlok mentese lemezre (XD-x32)\n", C_DEFAULT);
         kprint_color(" net info - halozat informacio (MAC, allapot)\n", C_DEFAULT);
         kprint_color(" net dump - kovetkezo csomag megjelenito\n", C_DEFAULT);
-        kprint_color(" ping <host> - ping parancs (pl. ping 192.168.1.1)\n", C_DEFAULT);
-        kprint_color(" XD install <csomagnev> - csomag telepitese (driver szint)\n", C_DEFAULT);
         kprint_color(" reboot - ujrainditas\n", C_DEFAULT);
     } else if (kstrcmp(cmd, "clear") == 0) {
         vga_clear();
@@ -168,6 +240,10 @@ static void shell_exec(const char* cmd) {
     } else if (cmd[0] == 'e' && cmd[1] == 'c' && cmd[2] == 'h' && cmd[3] == 'o' && cmd[4] == ' ') {
         kprint_color(cmd + 5, C_DEFAULT);
         kprint_color("\n", C_DEFAULT);
+    } else if (cmd[0]=='p'&&cmd[1]=='i'&&cmd[2]=='n'&&cmd[3]=='g'&&cmd[4]==' ') {
+        cmd_ping(cmd + 5);
+    } else if (cmd[0]=='X'&&cmd[1]=='D'&&cmd[2]==' ') {
+        cmd_xd(cmd + 3);
     } else {
         kprint_color("Ismeretlen: ", C_ERROR);
         kprint_color(cmd, C_DEFAULT);

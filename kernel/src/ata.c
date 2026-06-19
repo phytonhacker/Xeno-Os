@@ -14,17 +14,30 @@
 #define ATA_CMD_READ_PIO       0x20
 #define ATA_CMD_WRITE_PIO      0x30
 
-static void ata_wait_ready(void) {
-    while ((inb(ATA_PORT_STATUS) & 0x80) != 0); // Várjuk, míg BSY=0
-    while ((inb(ATA_PORT_STATUS) & 0x08) == 0); // Várjuk, míg DRQ=1
+/*
+ * Timeout-os várakozás: ha a lemez nem válaszol (pl. nincs csatlakoztatva
+ * megfelelően QEMU-ban), ne fagyjon le örökre a kernel. A timeout érték
+ * tisztán "iterációszám" alapú (nincs még valós időzítőnk a kernelben).
+ */
+#define ATA_TIMEOUT_ITERS 1000000
+
+/* Visszatérés: 1 = sikeres, 0 = timeout (lemez nem válaszolt) */
+static int ata_wait_ready(void) {
+    int timeout = ATA_TIMEOUT_ITERS;
+    while ((inb(ATA_PORT_STATUS) & 0x80) != 0) { if (--timeout <= 0) return 0; }
+    timeout = ATA_TIMEOUT_ITERS;
+    while ((inb(ATA_PORT_STATUS) & 0x08) == 0) { if (--timeout <= 0) return 0; }
+    return 1;
 }
 
-static void ata_wait_bsy(void) {
-    while ((inb(ATA_PORT_STATUS) & 0x80) != 0); // Várjuk, míg BSY=0
+static int ata_wait_bsy(void) {
+    int timeout = ATA_TIMEOUT_ITERS;
+    while ((inb(ATA_PORT_STATUS) & 0x80) != 0) { if (--timeout <= 0) return 0; }
+    return 1;
 }
 
 void ata_read_sector(uint32_t lba, uint16_t* buffer) {
-    ata_wait_bsy();
+    if (!ata_wait_bsy()) { for (int i = 0; i < 256; i++) buffer[i] = 0; return; }
     outb(ATA_PORT_DRIVE_HEAD, 0xE0 | ((lba >> 24) & 0x0F));
     outb(ATA_PORT_SECTOR_COUNT, 1);
     outb(ATA_PORT_LBA_LOW, (uint8_t)lba);
@@ -32,7 +45,7 @@ void ata_read_sector(uint32_t lba, uint16_t* buffer) {
     outb(ATA_PORT_LBA_HIGH, (uint8_t)(lba >> 16));
     outb(ATA_PORT_COMMAND, ATA_CMD_READ_PIO);
 
-    ata_wait_ready();
+    if (!ata_wait_ready()) { for (int i = 0; i < 256; i++) buffer[i] = 0; return; }
 
     for (int i = 0; i < 256; i++) {
         buffer[i] = inw(ATA_PORT_DATA);
@@ -40,7 +53,7 @@ void ata_read_sector(uint32_t lba, uint16_t* buffer) {
 }
 
 void ata_write_sector(uint32_t lba, const uint16_t* buffer) {
-    ata_wait_bsy();
+    if (!ata_wait_bsy()) return;
     outb(ATA_PORT_DRIVE_HEAD, 0xE0 | ((lba >> 24) & 0x0F));
     outb(ATA_PORT_SECTOR_COUNT, 1);
     outb(ATA_PORT_LBA_LOW, (uint8_t)lba);
@@ -48,7 +61,7 @@ void ata_write_sector(uint32_t lba, const uint16_t* buffer) {
     outb(ATA_PORT_LBA_HIGH, (uint8_t)(lba >> 16));
     outb(ATA_PORT_COMMAND, ATA_CMD_WRITE_PIO);
 
-    ata_wait_ready();
+    if (!ata_wait_ready()) return;
 
     for (int i = 0; i < 256; i++) {
         outw(ATA_PORT_DATA, buffer[i]);
