@@ -5,6 +5,7 @@
 #include "../include/shell.h"
 #include "../include/app.h"
 #include "../include/fs.h"
+#include "../include/net.h"
 
 typedef struct {
     uint16_t offset_low;
@@ -55,6 +56,14 @@ void kernel_main(void) {
     pic_init();
     idt_init();
     fs_init();
+
+    if (net_init()) {
+        kprint_color("[NET] ", C_PROMPT);
+        kprint_color("RTL8139 megtalalhato - halozat OK\n", C_INFO);
+    } else {
+        kprint_color("[NET] ", C_ERROR);
+        kprint("RTL8139 nem talalhato - halozat nincs\n");
+    }
 
     kprint_color("X-DOS v0.1\n", C_INFO);
     kprint_color("==========\n", C_INFO);
