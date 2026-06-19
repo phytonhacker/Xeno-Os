@@ -126,6 +126,7 @@ static void ed_save(void) {
     for (int i = 0; i < ed.len; i++) f->data[i] = ed.buf[i];
     f->data[ed.len] = 0;
     f->size = ed.len;
+    fs_sync();
     ed.dirty = 0;
     ed_redraw();
 }

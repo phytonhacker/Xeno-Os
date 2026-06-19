@@ -4,6 +4,7 @@
 #include "../include/keyboard.h"
 #include "../include/shell.h"
 #include "../include/app.h"
+#include "../include/fs.h"
 
 typedef struct {
     uint16_t offset_low;
@@ -53,6 +54,7 @@ void kernel_main(void) {
     cur_enable();
     pic_init();
     idt_init();
+    fs_init();
 
     kprint_color("X-DOS v0.1\n", C_INFO);
     kprint_color("==========\n", C_INFO);

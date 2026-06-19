@@ -38,6 +38,7 @@ static void shell_exec(const char* cmd) {
         kprint("  rm <fajlnev>            - fajl torlese\n");
         kprint("  cat <fajlnev>           - fajl tartalma\n");
         kprint("  set keyboard hu/en      - billentyuzet\n");
+        kprint("  sync                    - fajlok mentese lemezre (XD-x32)\n");
         kprint("  reboot                  - ujrainditas\n");
 
     } else if (kstrcmp(cmd, "clear") == 0) {
@@ -112,6 +113,11 @@ static void shell_exec(const char* cmd) {
             uint32_t base;
         } __attribute__((packed)) idt_ptr_reboot = {0, 0};
         __asm__ volatile("lidt %0\n int $0x00\n" : : "m"(idt_ptr_reboot));
+
+    } else if (kstrcmp(cmd, "sync") == 0) {
+        kprint_color("Fajlok mentese az XDisk (XD-x32) lemezre... ", C_INFO);
+        fs_sync();
+        kprint_color("Kesz.\n", C_PROMPT);
 
     } else if (cmd[0] == 'e' && cmd[1] == 'c' && cmd[2] == 'h' && cmd[3] == 'o' && cmd[4] == ' ') {
         kprint(cmd + 5);

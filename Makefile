@@ -11,6 +11,7 @@ ISODIR  = iso
 KERNEL_OBJS = kernel/kernel_entry.o \
               kernel/src/kernel.o \
               kernel/src/io.o \
+              kernel/src/ata.o \
               kernel/src/vga.o \
               kernel/src/string.o \
               kernel/src/keyboard.o \
@@ -39,14 +40,14 @@ myos.img: bootloader.bin kernel.bin
 	@echo "=== myos.img KÉSZ! ==="
 
 run: myos.img
-	qemu-system-i386 -drive format=raw,file=myos.img,if=floppy -boot a
+	qemu-system-i386 -drive format=raw,file=myos.img,if=ide,index=0,media=disk -boot c
 
 run-iso: myos.iso
 	qemu-system-i386 -cdrom myos.iso
 
 debug: myos.img
-	qemu-system-i386 -drive format=raw,file=myos.img,if=floppy \
-	                 -boot a -s -S &
+	qemu-system-i386 -drive format=raw,file=myos.img,if=ide,index=0,media=disk \
+	                 -boot c -s -S &
 	gdb -ex "target remote :1234" \
 	    -ex "set architecture i386"
 
