@@ -1,5 +1,3 @@
-
-
 CC      = gcc
 LD      = ld
 ASM     = nasm
@@ -10,6 +8,16 @@ LDFLAGS = -T kernel/kernel.ld --oformat binary -m elf_i386
 
 ISODIR  = iso
 
+KERNEL_OBJS = kernel/kernel_entry.o \
+              kernel/src/kernel.o \
+              kernel/src/io.o \
+              kernel/src/vga.o \
+              kernel/src/string.o \
+              kernel/src/keyboard.o \
+              kernel/src/fs.o \
+              kernel/src/editor.o \
+              kernel/src/shell.o
+
 all: myos.img
 
 bootloader.bin: boot/bootloader.asm
@@ -18,10 +26,10 @@ bootloader.bin: boot/bootloader.asm
 kernel/kernel_entry.o: kernel/kernel_entry.asm
 	$(ASM) -f elf32 $< -o $@
 
-kernel/kernel.o: kernel/kernel.c
+kernel/src/%.o: kernel/src/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-kernel.bin: kernel/kernel_entry.o kernel/kernel.o
+kernel.bin: $(KERNEL_OBJS)
 	$(LD) $(LDFLAGS) $^ -o $@
 
 myos.img: bootloader.bin kernel.bin
@@ -29,7 +37,6 @@ myos.img: bootloader.bin kernel.bin
 	dd if=bootloader.bin of=myos.img bs=512 count=1     conv=notrunc 2>/dev/null
 	dd if=kernel.bin     of=myos.img bs=512 seek=1      conv=notrunc 2>/dev/null
 	@echo "=== myos.img KÉSZ! ==="
-	@ls -lh myos.img
 
 run: myos.img
 	qemu-system-i386 -drive format=raw,file=myos.img,if=floppy -boot a
@@ -45,7 +52,7 @@ debug: myos.img
 
 clean:
 	rm -f bootloader.bin kernel.bin myos.img myos.iso
-	rm -f kernel/kernel_entry.o kernel/kernel.o
+	rm -f kernel/kernel_entry.o kernel/src/*.o
 	rm -rf $(ISODIR)
 
 .PHONY: all run run-iso debug clean
